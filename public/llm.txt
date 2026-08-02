@@ -1,0 +1,19 @@
+# Filmska Teorija
+
+Filmska Teorija is an interactive source-backed film theory learning app.
+
+Primary URL: https://mizcausevic-dev.github.io/filmska-teorija/
+Repository: https://github.com/mizcausevic-dev/filmska-teorija
+
+Source posture:
+- The core module registry is generated from the Wikipedia API for the user-supplied film theory pages.
+- Wikipedia text is attributed under the Creative Commons Attribution-ShareAlike License 4.0 unless otherwise noted.
+- The app labels redirects, including Cognitive film theory resolving to Cognitivism (aesthetics), and Screen theory resolving to Marxist film theory.
+- Local media URLs, scene breakdowns, reader links, and essay notes are browser-local in this static build.
+- Community boards and AI partner behavior are local prototypes, not a live moderated network or live model service.
+
+Important files:
+- /src/data/wikipediaSources.json
+- /scripts/fetch-wikipedia-sources.mjs
+- /privacy.html
+- /terms.html
