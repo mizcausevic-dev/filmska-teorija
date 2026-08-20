@@ -144,10 +144,53 @@ export const practicePages = practiceIds
   .map((id) => sourceById.get(id))
   .filter((page): page is SourcePage => Boolean(page));
 
+// Wikipedia leads often include abbreviations before the real sentence boundary.
+const alwaysInlineAbbreviations = new Set(['cf', 'dr', 'e.g', 'i.e', 'jr', 'lit', 'mr', 'mrs', 'ms', 'prof', 'sr', 'st', 'vs']);
+const contextSensitiveAbbreviations = new Set(['d.c', 'etc', 'u.k', 'u.s']);
+const closingSentenceChars = new Set(['"', "'", ')', ']', '}']);
+
+function tokenBeforePeriod(text: string, periodIndex: number) {
+  return text
+    .slice(0, periodIndex)
+    .match(/([A-Za-z](?:[A-Za-z]|\.)*)$/)?.[1]
+    ?.toLowerCase();
+}
+
+function nextWordStartsLowercase(text: string, startIndex: number) {
+  const nextWord = text.slice(startIndex).match(/^[\s"'([{]*([A-Za-z])/)?.[1];
+  return Boolean(nextWord && nextWord === nextWord.toLowerCase());
+}
+
+function isInlineAbbreviation(text: string, periodIndex: number) {
+  const token = tokenBeforePeriod(text, periodIndex);
+  if (!token) return false;
+  if (alwaysInlineAbbreviations.has(token)) return true;
+  if (!contextSensitiveAbbreviations.has(token)) return false;
+  return nextWordStartsLowercase(text, periodIndex + 1);
+}
+
+function firstSentenceEnd(text: string) {
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character !== '.' && character !== '!' && character !== '?') continue;
+    if (character === '.' && isInlineAbbreviation(text, index)) continue;
+
+    let sentenceEnd = index + 1;
+    while (sentenceEnd < text.length && closingSentenceChars.has(text[sentenceEnd])) {
+      sentenceEnd += 1;
+    }
+
+    if (sentenceEnd === text.length || /\s/.test(text[sentenceEnd])) {
+      return sentenceEnd;
+    }
+  }
+  return -1;
+}
+
 export function firstSentence(text: string) {
   const normalized = text.replace(/\s+/g, ' ').trim();
-  const sentence = normalized.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim();
-  return sentence || normalized.slice(0, 220);
+  const sentenceEnd = firstSentenceEnd(normalized);
+  return sentenceEnd >= 0 ? normalized.slice(0, sentenceEnd).trim() : normalized.slice(0, 220);
 }
 
 export function shortExtract(page: SourcePage, maxLength = 360) {

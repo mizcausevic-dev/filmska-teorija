@@ -39,6 +39,12 @@ Local preview used during QA: `http://127.0.0.1:4179/`
 npm run qa
 ```
 
+If port `4179` is already serving another local app, run smoke checks on a clean port:
+
+```powershell
+$env:PLAYWRIGHT_PORT='4187'; npm run smoke; Remove-Item Env:PLAYWRIGHT_PORT
+```
+
 The QA script runs source refresh, Oxlint, TypeScript/Vite production build, and Playwright smoke checks. Screenshots are written to `docs/qa/`.
 
 Current note: the production build emits a Vite chunk-size warning because Three.js is included for the interactive graph.

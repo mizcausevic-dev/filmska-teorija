@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const host = process.env.PLAYWRIGHT_HOST ?? '127.0.0.1';
+const port = process.env.PLAYWRIGHT_PORT ?? '4179';
+const baseURL = `http://${host}:${port}/`;
+
 export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
@@ -7,13 +11,13 @@ export default defineConfig({
     timeout: 5_000,
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 4179',
-    url: 'http://127.0.0.1:4179/',
-    reuseExistingServer: true,
+    command: `npm run dev -- --host ${host} --port ${port} --strictPort`,
+    url: baseURL,
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === '1',
     timeout: 30_000,
   },
   use: {
-    baseURL: 'http://127.0.0.1:4179/',
+    baseURL,
     trace: 'retain-on-failure',
   },
   projects: [

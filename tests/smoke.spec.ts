@@ -63,6 +63,20 @@ test('renders the source-backed workbench and supports the core desktop flow', a
   await page.screenshot({ path: 'docs/qa/desktop-workbench.png', fullPage: true });
 });
 
+test('keeps abbreviation-heavy auteur summaries intact across shared summary surfaces', async ({ page }) => {
+  await page.goto('/#auteur');
+  const expectedEnding = 'across a diverse body of work.';
+
+  await expect(page.locator('.workspace-header p')).toContainText(expectedEnding);
+  await expect(
+    page.locator('.annotation-timeline article').filter({ hasText: 'Concept anchor' }).locator('p'),
+  ).toContainText(expectedEnding);
+  await expect(page.locator('#essay article').filter({ hasText: 'Next citation move' }).locator('p')).toContainText(
+    expectedEnding,
+  );
+  await expect(page.locator('#blog article').first().locator('p')).toContainText(expectedEnding);
+});
+
 test('collapses to a vertical mobile workflow without horizontal navigation', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.includes('desktop'), 'mobile-only workflow');
   await page.goto('/#marxist-film-theory');
