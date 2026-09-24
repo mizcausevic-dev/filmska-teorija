@@ -4,13 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "source:refresh": "node scripts/fetch-wikipedia-sources.mjs",
+    "dev": "node scripts/generate-module-pages.mjs && vite",
+    "source:refresh": "node scripts/fetch-wikipedia-sources.mjs && npm run source:validate",
+    "source:validate": "node scripts/validate-sources.mjs",
     "typecheck": "tsc -b",
-    "build": "tsc -b && vite build",
+    "build": "npm run source:validate && node scripts/generate-module-pages.mjs && tsc -b && vite build",
     "lint": "oxlint",
     "smoke": "playwright test",
-    "qa": "npm run source:refresh && npm run lint && npm run build && npm run smoke",
+    "qa": "npm run source:validate && npm run lint && npm run build && npm run smoke",
     "preview": "vite preview"
   },
   "dependencies": {

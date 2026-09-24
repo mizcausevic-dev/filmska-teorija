@@ -1,0 +1,49 @@
+{
+  "auteur": {
+    "take": "A recurring style can support an authorship argument, but the credit line remains evidence too. Suspense is credited to both Lois Weber and Phillips Smalley, so its striking triptych cannot be assigned to one director without further production records.",
+    "method": "Describe a formal pattern across works, then check credits and production evidence before naming its author.",
+    "references": [
+      { "label": "MoMA, Suspense", "url": "https://www.moma.org/collection/works/304339" },
+      { "label": "BFI, Suspense", "url": "https://www.bfi.org.uk/film/6fec2bfd-590f-5838-8295-2b3946dff65a/suspense" }
+    ]
+  },
+  "cinematography": {
+    "take": "Composition guides attention within a shot. In Suspense, three simultaneous actions share one frame; a close reading can follow how this layout lets viewers compare spaces before a cut would have shown them separately.",
+    "method": "Describe framing, scale, movement, and duration first. Then test how an alternative framing might change what the viewer notices.",
+    "references": [
+      { "label": "MoMA, Suspense", "url": "https://www.moma.org/collection/works/304339" }
+    ]
+  },
+  "apparatus-theory": {
+    "take": "An apparatus reading begins with the position offered to the spectator. Before naming an ideology, describe where the camera puts the viewer, what it withholds, and whose view the scene makes easy to adopt.",
+    "method": "Record one camera position and one off-screen fact. Then test whether changing either would change the viewer's relationship to the action."
+  },
+  "linguistic-film-theory": {
+    "take": "A film can make meaning through repeated visual or sonic patterns, not only through dialogue. This module's short source extract identifies interpretation as its subject but does not supply a full vocabulary of signs.",
+    "method": "Choose a repeated shot, sound, or edit. Describe each occurrence before arguing what the repetition communicates."
+  },
+  "marxist-film-theory": {
+    "take": "A political reading needs evidence in the scene, not just a political label. Track who controls space, work, resources, and the outcome, then ask whose interests the plot treats as natural.",
+    "method": "Separate visible relations of power from your explanation of them; support the explanation with a second moment in the film."
+  },
+  "screen-theory": {
+    "take": "The supplied Screen theory URL currently redirects to Marxist film theory. That source does not establish Screen theory as a distinct position, so this module is a research question rather than a settled definition.",
+    "method": "Use the Marxist source as a starting point only. Do not cite it as an independent account of Screen theory; seek a primary journal text before making that claim."
+  },
+  "glossary-of-motion-picture-terms": {
+    "take": "A term becomes useful when it helps a viewer identify something repeatable in a film. A list of terms is a starting index; it cannot substitute for a sourced definition and a concrete example.",
+    "method": "Name the technique, mark a moment where it occurs, and link the definition you used before interpreting its effect."
+  },
+  "invisible-auditor": {
+    "take": "The available extract only says that the invisible auditor varies the invisible witness model. It does not explain the model's mechanics, so a confident definition here would outrun the source.",
+    "method": "Treat this as an open research prompt: identify who appears to hear the scene, what the soundtrack reveals, and what further source would verify the model."
+  },
+  "list-of-film-periodicals": {
+    "take": "A film periodical is useful when an argument can be traced to its author, publication, and issue. The source distinguishes sustained discussion of films and production from consumer-oriented reviews.",
+    "method": "Record an article's author, date, publication, claim, and URL before adding it to a scene analysis."
+  },
+  "philosophy-of-film": {
+    "take": "Philosophy of film asks what film is and how it can mean, represent, or count as art. A productive scene question is narrower: which assumption about images or spectators does this particular formal choice test?",
+    "method": "State the philosophical question first, identify one visible or audible detail, and distinguish your answer from the detail itself."
+  }
+}

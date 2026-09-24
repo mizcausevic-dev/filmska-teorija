@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   BadgeDollarSign,
@@ -30,7 +30,10 @@ import {
   X,
 } from 'lucide-react';
 import './App.css';
-import { TheoryGraph } from './components/TheoryGraph';
+import editorial from './data/editorial.json';
+import { caseStudies } from './data/caseStudies';
+import { buildKnowledgeGraph } from './data/knowledge';
+import { moduleUrl, routeModuleId } from './routes';
 import {
   buildAnnotationPrompts,
   featureRoadmap,
@@ -52,6 +55,26 @@ const emptyMedia: MediaSlot = {
   audioUrl: '',
   podcastUrl: '',
 };
+
+const TheoryGraph = lazy(() => import('./components/TheoryGraph').then((module) => ({ default: module.TheoryGraph })));
+const editorialById = editorial as Record<string, {
+  take: string;
+  method: string;
+  references?: Array<{ label: string; url: string }>;
+}>;
+
+function formatTimecode(seconds: number) {
+  const whole = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(whole / 60);
+  return `${String(minutes).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}`;
+}
+
+function parseTimecode(value: string) {
+  const parts = value.split(':').map(Number);
+  if (parts.length < 2 || parts.length > 3 || parts.some((part) => !Number.isInteger(part) || part < 0)) return null;
+  if (parts.slice(1).some((part) => part > 59)) return null;
+  return parts.reduce((total, part) => total * 60 + part, 0);
+}
 
 const adSlots = [
   { id: 'right-rail-top', label: 'Right rail top', size: '300x250', state: 'Placeholder only' },
@@ -200,11 +223,15 @@ function ModuleNav({
 
       <nav className="module-list" aria-label="Film theory modules">
         {filteredPages.map((page) => (
-          <button
+          <a
             key={page.id}
-            type="button"
+            href={moduleUrl(page.id)}
             className={page.id === activeId ? 'active' : ''}
-            onClick={() => onSelect(page.id)}
+            aria-current={page.id === activeId ? 'page' : undefined}
+            onClick={(event) => {
+              event.preventDefault();
+              onSelect(page.id);
+            }}
           >
             <span className={`area-dot area-${page.area.toLowerCase()}`} />
             <span>
@@ -213,7 +240,7 @@ function ModuleNav({
                 {page.area} · {page.group}
               </small>
             </span>
-          </button>
+          </a>
         ))}
       </nav>
 
@@ -232,20 +259,29 @@ function ModuleNav({
 function Workbench({
   page,
   media,
+  items,
+  onTimeUpdate,
   onJump,
 }: {
   page: SourcePage;
   media: MediaSlot;
+  items: BreakdownItem[];
+  onTimeUpdate: (seconds: number) => void;
   onJump: (section: string) => void;
 }) {
   const annotations = buildAnnotationPrompts(page);
-  const annotationPositions = [
-    { left: 12, top: 18 },
-    { left: 40, top: 18 },
-    { left: 68, top: 18 },
-  ];
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const heroUrl = media.videoUrl || media.imageUrl;
   const hasHero = Boolean(safeUrl(heroUrl));
+  const directVideo = media.videoUrl && urlKind(media.videoUrl) === 'video';
+  const activeItems = items.filter((item) => item.moduleId === page.id);
+
+  const seekTo = (timecode: string) => {
+    const seconds = parseTimecode(timecode);
+    if (seconds !== null && videoRef.current && Number.isFinite(videoRef.current.duration)) {
+      videoRef.current.currentTime = Math.min(seconds, videoRef.current.duration);
+    }
+  };
 
   return (
     <section className="panel workbench-panel fx-layer" id="workbench">
@@ -256,7 +292,15 @@ function Workbench({
         </a>
       </div>
       <div className="media-stage">
-        {hasHero ? (
+        {directVideo ? (
+          <video
+            ref={videoRef}
+            src={safeUrl(media.videoUrl)}
+            controls
+            preload="metadata"
+            onTimeUpdate={(event) => onTimeUpdate(event.currentTarget.currentTime)}
+          />
+        ) : hasHero ? (
           <MediaEmbed url={heroUrl} label={`${page.title} media`} />
         ) : (
           <div className="media-placeholder">
@@ -267,38 +311,30 @@ function Workbench({
             </div>
           </div>
         )}
-        <div className="annotation-layer">
-          {annotations.map((annotation, index) => (
-            <button
-              key={annotation.label}
-              type="button"
-              className={`annotation-chip annotation-${annotation.tone}`}
-              style={{
-                insetInlineStart: `${annotationPositions[index]?.left ?? 12}%`,
-                insetBlockStart: `${annotationPositions[index]?.top ?? 18}%`,
-              }}
-              onClick={() => onJump('breakdown')}
-            >
-              <strong>{annotation.time}</strong>
-              <span>{annotation.label}</span>
-            </button>
-          ))}
-        </div>
       </div>
-      <div className="annotation-timeline" aria-label="Synchronized theoretical annotations">
+      <div className="annotation-timeline" aria-label="Theory study prompts">
         {annotations.map((annotation) => (
           <article key={annotation.label}>
-            <time>{annotation.time}</time>
             <strong>{annotation.label}</strong>
             <p>{annotation.body}</p>
           </article>
         ))}
+      </div>
+      <div className="clip-tags">
+        <strong>{directVideo ? 'Timed scene notes' : 'Scene notes'}</strong>
+        {activeItems.length ? activeItems.map((item) => (
+          <button key={item.id} type="button" onClick={() => directVideo ? seekTo(item.timecode) : onJump('breakdown')}>
+            <time>{item.timecode}</time> {item.technique}
+          </button>
+        )) : <span>Add an evidence tag below to build a scene reading.</span>}
+        {!directVideo && media.videoUrl ? <small>Embedded players do not expose playback time here; enter timecodes manually.</small> : null}
       </div>
     </section>
   );
 }
 
 function SourceCard({ page }: { page: SourcePage }) {
+  const note = editorialById[page.id];
   return (
     <section className="panel source-panel">
       <div className="panel-bar paper">
@@ -315,6 +351,20 @@ function SourceCard({ page }: { page: SourcePage }) {
             </p>
           </div>
         </div>
+        {note ? (
+          <div className="editorial-note">
+            <strong>Filmska reading</strong>
+            <p>{note.take}</p>
+            <strong>Try it on a scene</strong>
+            <p>{note.method}</p>
+            {note.references?.map((reference) => (
+              <a key={reference.url} className="text-link" href={reference.url} target="_blank" rel="noreferrer">
+                {reference.label} <ExternalLink size={13} />
+              </a>
+            ))}
+          </div>
+        ) : null}
+        <strong className="source-label">Wikipedia source extract</strong>
         <p>{shortExtract(page, 680)}</p>
         <div className="tag-stack">
           {[page.group, page.period, ...page.categories.slice(0, 4)].map((tag) => (
@@ -387,6 +437,10 @@ function MediaUrlPanel({
 function LensSimulator({ page }: { page: SourcePage }) {
   const [selectedLens, setSelectedLens] = useState(lensPages[0]?.id ?? page.id);
   const activeLens = sourceById.get(selectedLens) ?? lensPages[0] ?? page;
+
+  useEffect(() => {
+    if (lensPages.some((lens) => lens.id === page.id)) setSelectedLens(page.id);
+  }, [page.id]);
 
   return (
     <section className="panel lens-panel" id="lenses">
@@ -480,13 +534,115 @@ function PracticePanel({ activeTitle }: { activeTitle: string }) {
   );
 }
 
+function KnowledgePanel({ activeId, onSelect }: { activeId: string; onSelect: (id: string) => void }) {
+  const [show3d, setShow3d] = useState(false);
+  const graph = useMemo(() => buildKnowledgeGraph(sourcePages), []);
+  const nodes = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph]);
+  const sourceLinks = useMemo(
+    () => graph.edges.filter((edge) => edge.relation === 'Wikipedia link' && edge.from === activeId),
+    [graph, activeId],
+  );
+  const visibleEdges = useMemo(
+    () => graph.edges.filter((edge) => edge.relation !== 'Wikipedia link' || edge.from === activeId || edge.to === activeId),
+    [graph, activeId],
+  );
+
+  return (
+    <section className="panel graph-panel" id="graph">
+      <div className="panel-bar paper"><span>Concept Map & Knowledge Graph</span><Network size={16} /></div>
+      <div className="graph-accessible">
+        <p>Documented connections between theorists, publications, concepts, and modules.</p>
+        <ul>
+          {graph.edges.filter((edge) => edge.relation !== 'Wikipedia link').map((edge) => {
+            const from = nodes.get(edge.from);
+            const to = nodes.get(edge.to);
+            return (
+              <li key={`${edge.from}-${edge.to}`}>
+                <span>{from?.label} <em>{edge.relation}</em> {to?.label}</span>
+                {to?.moduleId ? (
+                  <button type="button" onClick={() => onSelect(to.moduleId!)}>Open module</button>
+                ) : null}
+                <a href={edge.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Source for ${from?.label} to ${to?.label}`}>
+                  <ExternalLink size={14} />
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+        {sourceLinks.length ? (
+          <>
+            <strong>Links from this source article</strong>
+            <ul>
+              {sourceLinks.map((edge) => (
+                <li key={`source-${edge.from}-${edge.to}`}>
+                  <button type="button" onClick={() => onSelect(edge.to)}>{nodes.get(edge.to)?.label}</button>
+                  <a href={edge.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Wikipedia source for ${nodes.get(edge.to)?.label}`}>
+                    <ExternalLink size={14} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+        {!show3d ? (
+          <button type="button" className="ghost-button" onClick={() => setShow3d(true)}>Load 3D view</button>
+        ) : null}
+      </div>
+      {show3d ? (
+        <Suspense fallback={<p className="graph-loading">Loading 3D view...</p>}>
+          <TheoryGraph nodes={graph.nodes} edges={visibleEdges} activeId={activeId} onSelect={onSelect} />
+        </Suspense>
+      ) : null}
+    </section>
+  );
+}
+
+function CaseStudyPanel({ activeId, onSelect }: { activeId: string; onSelect: (id: string) => void }) {
+  const relevant = caseStudies.filter((study) => study.moduleId === activeId);
+  const studies = relevant.length ? relevant : caseStudies;
+  return (
+    <section className="panel case-study-panel" id="case-studies">
+      <div className="panel-bar paper"><span>Worked Scene Readings</span><Clapperboard size={16} /></div>
+      <div className="case-study-list">
+        {studies.map((study) => (
+          <article key={study.id}>
+            <div className="case-study-heading">
+              <div><small>{study.film}</small><h3>{study.scene}</h3></div>
+              <button type="button" className="ghost-button" onClick={() => onSelect(study.moduleId)}>
+                {sourceById.get(study.moduleId)?.title} <ChevronRight size={14} />
+              </button>
+            </div>
+            <dl>
+              <div><dt>Observable evidence</dt><dd>{study.observation}</dd></div>
+              <div><dt>Our reading</dt><dd>{study.reading}</dd></div>
+              <div><dt>Counter-reading</dt><dd>{study.counterReading}</dd></div>
+            </dl>
+            <div className="case-citations">
+              <strong>Sources</strong>
+              {study.citations.map((citation) => (
+                <a key={citation.url} href={citation.url} target="_blank" rel="noreferrer" title={citation.detail}>
+                  {citation.label} <ExternalLink size={13} />
+                </a>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function BreakdownBoard({
   activePage,
+  onCaptureTime,
+  canSync,
   items,
   onAdd,
   onRemove,
 }: {
   activePage: SourcePage;
+  onCaptureTime: () => string;
+  canSync: boolean;
   items: BreakdownItem[];
   onAdd: (item: Omit<BreakdownItem, 'createdAt' | 'id'>) => void;
   onRemove: (id: string) => void;
@@ -495,6 +651,7 @@ function BreakdownBoard({
   const [technique, setTechnique] = useState('');
   const [evidence, setEvidence] = useState('');
   const [lens, setLens] = useState(activePage.title);
+  const [timeError, setTimeError] = useState('');
 
   useEffect(() => {
     setLens(activePage.title);
@@ -504,6 +661,10 @@ function BreakdownBoard({
 
   const submit = () => {
     if (!technique.trim() || !evidence.trim()) return;
+    if (parseTimecode(timecode) === null) {
+      setTimeError('Use a timecode such as 01:24 or 01:02:24.');
+      return;
+    }
     onAdd({
       moduleId: activePage.id,
       timecode: timecode.trim() || '00:00',
@@ -513,6 +674,7 @@ function BreakdownBoard({
     });
     setTechnique('');
     setEvidence('');
+    setTimeError('');
   };
 
   return (
@@ -523,6 +685,11 @@ function BreakdownBoard({
       </div>
       <div className="breakdown-form">
         <input value={timecode} onChange={(event) => setTimecode(event.target.value)} aria-label="Timecode" />
+        {canSync ? (
+          <button type="button" className="ghost-button" onClick={() => setTimecode(onCaptureTime())}>
+            Use player time
+          </button>
+        ) : null}
         <input
           value={technique}
           onChange={(event) => setTechnique(event.target.value)}
@@ -546,6 +713,7 @@ function BreakdownBoard({
           <Plus size={15} /> Add tag
         </button>
       </div>
+      {timeError ? <p className="form-error">{timeError}</p> : null}
       <div className="breakdown-list">
         {activeItems.length ? (
           activeItems.map((item) => (
@@ -692,9 +860,16 @@ function ReaderPanel({
   );
 }
 
-function EssayPartner({ activePage }: { activePage: SourcePage }) {
-  const [essay, setEssay] = useState('');
-  const lowerEssay = essay.toLowerCase();
+function EssayPartner({
+  activePage,
+  value,
+  onChange,
+}: {
+  activePage: SourcePage;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const lowerEssay = value.toLowerCase();
   const matchedPages = sourcePages.filter((page) => {
     const keywords = titleKeywords(page);
     return keywords.some((keyword) => lowerEssay.includes(keyword));
@@ -708,8 +883,8 @@ function EssayPartner({ activePage }: { activePage: SourcePage }) {
         <Bot size={16} />
       </div>
       <textarea
-        value={essay}
-        onChange={(event) => setEssay(event.target.value)}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
         placeholder={`Draft a claim about ${activePage.title}`}
         aria-label="Essay outline"
       />
@@ -809,31 +984,73 @@ function BlogPanel({ activePage }: { activePage: SourcePage }) {
 }
 
 function App() {
-  const initialId = window.location.hash.replace('#', '') || 'film-theory';
-  const [activeId, setActiveId] = useState(sourceById.has(initialId) ? initialId : 'film-theory');
+  const [activeId, setActiveId] = useState(routeModuleId);
   const [filter, setFilter] = useState('');
   const [navOpen, setNavOpen] = useState(false);
   const [shareStatus, setShareStatus] = useState('');
   const [mediaById, setMediaById] = useLocalStorageState<Record<string, MediaSlot>>('filmska-media', {});
   const [breakdowns, setBreakdowns] = useLocalStorageState<BreakdownItem[]>('filmska-breakdowns', []);
   const [readerItems, setReaderItems] = useLocalStorageState<ReaderItem[]>('filmska-reader', []);
+  const [essays, setEssays] = useLocalStorageState<Record<string, string>>('filmska-essays', {});
+  const playerTimeRef = useRef(0);
   const activePage = sourceById.get(activeId) ?? sourcePages[0];
   const activeMedia = mediaById[activePage.id] ?? emptyMedia;
   const [draftMedia, setDraftMedia] = useState(activeMedia);
   const [mediaError, setMediaError] = useState('');
 
   useEffect(() => {
-    window.history.replaceState(null, '', `#${activePage.id}`);
     setDraftMedia(mediaById[activePage.id] ?? emptyMedia);
     setMediaError('');
   }, [activePage.id, mediaById]);
+
+  useEffect(() => {
+    if (window.location.hash && sourceById.has(window.location.hash.slice(1))) {
+      window.history.replaceState(null, '', moduleUrl(window.location.hash.slice(1)));
+    }
+    const onPopState = () => setActiveId(routeModuleId());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    const rootRoute = window.location.pathname === import.meta.env.BASE_URL;
+    const title = rootRoute ? 'Filmska Teorija' : `${activePage.title} | Filmska Teorija`;
+    const description = editorialById[activePage.id]?.take ?? firstSentence(activePage.extract);
+    document.title = title;
+    const setMeta = (selector: string, content: string) => {
+      const element = document.head.querySelector<HTMLMetaElement>(selector);
+      if (element) element.content = content;
+    };
+    setMeta('meta[name="description"]', description);
+    setMeta('meta[property="og:title"]', title);
+    setMeta('meta[property="og:description"]', description);
+    document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.setAttribute(
+      'href',
+      `${window.location.origin}${rootRoute ? import.meta.env.BASE_URL : moduleUrl(activePage.id)}`,
+    );
+    const indexable = rootRoute || caseStudies.some((study) => study.moduleId === activePage.id);
+    let robots = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    if (!indexable && !robots) {
+      robots = document.createElement('meta');
+      robots.name = 'robots';
+      document.head.appendChild(robots);
+    }
+    if (robots) {
+      if (indexable) robots.remove();
+      else robots.content = 'noindex';
+    }
+  }, [activePage.id, activePage.title, activePage.extract]);
 
   const mediaPreviews = [activeMedia.imageUrl, activeMedia.videoUrl, activeMedia.audioUrl, activeMedia.podcastUrl].filter(
     Boolean,
   );
 
   const selectPage = (id: string) => {
+    if (window.location.pathname !== moduleUrl(id)) {
+      window.history.pushState(null, '', moduleUrl(id));
+    }
     setActiveId(id);
+    playerTimeRef.current = 0;
     setNavOpen(false);
   };
 
@@ -869,7 +1086,7 @@ function App() {
   };
 
   const shareModule = async () => {
-    const shareUrl = `${window.location.origin}${window.location.pathname}#${activePage.id}`;
+    const shareUrl = `${window.location.origin}${moduleUrl(activePage.id)}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: `Filmska Teorija: ${activePage.title}`, url: shareUrl });
@@ -885,11 +1102,17 @@ function App() {
 
   return (
     <div className="app-shell">
-      <aside className={`side-rail ${navOpen ? 'open' : ''}`}>
+      <aside id="module-nav" className={`side-rail ${navOpen ? 'open' : ''}`}>
         <ModuleNav activeId={activePage.id} filter={filter} onFilter={setFilter} onSelect={selectPage} />
       </aside>
 
-      <button type="button" className="mobile-nav-button" onClick={() => setNavOpen((current) => !current)}>
+      <button
+        type="button"
+        className="mobile-nav-button"
+        aria-controls="module-nav"
+        aria-expanded={navOpen}
+        onClick={() => setNavOpen((current) => !current)}
+      >
         {navOpen ? <X size={22} /> : <Menu size={22} />}
         <span>Modules</span>
       </button>
@@ -899,7 +1122,7 @@ function App() {
           <div>
             <span className="source-kicker">Source-backed film theory atlas</span>
             <h1>{activePage.title}</h1>
-            <p>{firstSentence(activePage.extract)}</p>
+            <p>{editorialById[activePage.id]?.take ?? firstSentence(activePage.extract)}</p>
           </div>
           <button type="button" className="share-button" onClick={shareModule}>
             <Share2 size={17} />
@@ -909,19 +1132,22 @@ function App() {
 
         <div className="workspace-grid">
           <div className="primary-stack">
-            <Workbench page={activePage} media={activeMedia} onJump={jumpTo} />
+            <Workbench
+              page={activePage}
+              media={activeMedia}
+              items={breakdowns}
+              onTimeUpdate={(seconds) => { playerTimeRef.current = seconds; }}
+              onJump={jumpTo}
+            />
             <LensSimulator page={activePage} />
-            <section className="panel graph-panel" id="graph">
-              <div className="panel-bar paper">
-                <span>Concept Map & Knowledge Graph</span>
-                <Network size={16} />
-              </div>
-              <TheoryGraph pages={sourcePages} activeId={activePage.id} onSelect={selectPage} />
-            </section>
+            <KnowledgePanel activeId={activePage.id} onSelect={selectPage} />
             <TimelinePanel onSelect={selectPage} />
             <PracticePanel activeTitle={activePage.title} />
+            <CaseStudyPanel activeId={activePage.id} onSelect={selectPage} />
             <BreakdownBoard
               activePage={activePage}
+              onCaptureTime={() => formatTimecode(playerTimeRef.current)}
+              canSync={Boolean(activeMedia.videoUrl && urlKind(activeMedia.videoUrl) === 'video')}
               items={breakdowns}
               onAdd={(item) =>
                 setBreakdowns((current) => [
@@ -942,7 +1168,11 @@ function App() {
               }
               onRemove={(id) => setReaderItems((current) => current.filter((item) => item.id !== id))}
             />
-            <EssayPartner activePage={activePage} />
+            <EssayPartner
+              activePage={activePage}
+              value={essays[activePage.id] ?? ''}
+              onChange={(value) => setEssays((current) => ({ ...current, [activePage.id]: value }))}
+            />
             <BlogPanel activePage={activePage} />
             <RoadmapPanel />
           </div>
@@ -991,9 +1221,9 @@ function App() {
           <a href="https://www.linkedin.com/company/kinetic-gain/" target="_blank" rel="noreferrer">
             LinkedIn
           </a>
-          <a href="./privacy.html">Privacy</a>
-          <a href="./terms.html">Terms</a>
-          <a href="./llm.txt">llm.txt</a>
+          <a href={`${import.meta.env.BASE_URL}privacy.html`}>Privacy</a>
+          <a href={`${import.meta.env.BASE_URL}terms.html`}>Terms</a>
+          <a href={`${import.meta.env.BASE_URL}llm.txt`}>llm.txt</a>
         </footer>
       </main>
     </div>

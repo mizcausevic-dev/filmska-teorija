@@ -36,11 +36,10 @@ const query = new URLSearchParams({
   format: 'json',
   origin: '*',
   redirects: '1',
-  prop: 'extracts|info|links|pageimages|categories',
+  prop: 'extracts|info|pageimages|categories',
   exintro: '1',
   explaintext: '1',
   inprop: 'url',
-  pllimit: 'max',
   cllimit: '50',
   piprop: 'thumbnail|original',
   pithumbsize: '900',
@@ -63,6 +62,44 @@ const apiPages = Object.values(payload.query.pages);
 const byTitle = new Map(apiPages.map((page) => [page.title, page]));
 const redirectMap = new Map(payload.query.redirects?.map((redirect) => [redirect.from, redirect.to]) ?? []);
 const normalizedMap = new Map(payload.query.normalized?.map((entry) => [entry.from, entry.to]) ?? []);
+
+function cleanThumbnail(value) {
+  if (!value) return null;
+  const url = new URL(value);
+  for (const key of [...url.searchParams.keys()]) {
+    if (key.startsWith('utm_')) url.searchParams.delete(key);
+  }
+  return url.toString();
+}
+
+async function fetchRelatedTitles(pageId, ownTitle) {
+  const titles = new Set();
+  let continuation = null;
+  do {
+    const params = new URLSearchParams({
+      action: 'query',
+      format: 'json',
+      prop: 'links',
+      pageids: String(pageId),
+      pllimit: 'max',
+      ...(continuation ?? {}),
+    });
+    const result = await fetch(`${api}?${params}`, {
+      headers: {
+        'User-Agent': 'FilmskaTeorija/1.0 (source-backed educational app; https://github.com/mizcausevic-dev/filmska-teorija)',
+      },
+    });
+    if (!result.ok) throw new Error(`Wikipedia links failed for ${ownTitle}: ${result.status}`);
+    const body = await result.json();
+    const entry = body.query?.pages?.[pageId];
+    for (const link of entry?.links ?? []) {
+      if (titleSet.has(link.title) && link.title !== ownTitle) titles.add(link.title);
+    }
+    continuation = body.continue ?? null;
+  } while (continuation);
+  return [...titles];
+}
+
 async function fetchFallbackExtract(title) {
   const fallbackQuery = new URLSearchParams({
     action: 'query',
@@ -103,11 +140,7 @@ const normalized = await Promise.all(pages.map(async (page, index) => {
     throw new Error(`Missing Wikipedia page: ${page.title}`);
   }
 
-  const linkedTitles =
-    apiPage.links
-      ?.map((link) => link.title)
-      .filter((title) => titleSet.has(title) && title !== page.title)
-      .slice(0, 12) ?? [];
+  const linkedTitles = await fetchRelatedTitles(apiPage.pageid, page.title);
 
   const categories =
     apiPage.categories
@@ -128,22 +161,20 @@ const normalized = await Promise.all(pages.map(async (page, index) => {
     sourceUrl: apiPage.fullurl,
     canonicalUrl: apiPage.canonicalurl,
     extract: extract || (await fetchFallbackExtract(apiPage.title)),
-    thumbnail: apiPage.thumbnail?.source ?? apiPage.original?.source ?? null,
+    thumbnail: cleanThumbnail(apiPage.thumbnail?.source ?? apiPage.original?.source),
     relatedTitles: linkedTitles,
     categories,
     retrievedAt: new Date().toISOString(),
   };
 }));
 
-const linkMap = Object.fromEntries(
-  normalized.flatMap((page) => [
-    [page.title, page.id],
-    [page.sourceTitle, page.id],
-  ]),
-);
+const linkMap = new Map(normalized.map((page) => [page.title, page.id]));
+for (const page of normalized) {
+  if (!linkMap.has(page.sourceTitle)) linkMap.set(page.sourceTitle, page.id);
+}
 const withRelations = normalized.map((page) => ({
   ...page,
-  relatedIds: page.relatedTitles.map((title) => linkMap[title]).filter(Boolean),
+  relatedIds: [...new Set(page.relatedTitles.map((title) => linkMap.get(title)).filter((id) => id && id !== page.id))],
 }));
 
 const sourceRegistry = {

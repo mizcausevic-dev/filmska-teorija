@@ -27,10 +27,16 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
+      - name: Lint
+        run: npm run lint
       - name: Build
         run: npm run build
         env:
           GITHUB_PAGES: "true"
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Smoke
+        run: npm run smoke
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:

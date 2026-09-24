@@ -1,19 +1,19 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import type { SourcePage } from '../types';
+import type { GraphEdge, GraphNode } from '../data/knowledge';
 
 type TheoryGraphProps = {
-  pages: SourcePage[];
+  nodes: GraphNode[];
+  edges: GraphEdge[];
   activeId: string;
   onSelect: (id: string) => void;
 };
 
-const areaColors: Record<SourcePage['area'], number> = {
-  Concept: 0xf2b84b,
-  Foundation: 0x7dd3fc,
-  Practice: 0x5eead4,
-  Reference: 0xd6d3d1,
-  Theory: 0xf87171,
+const kindColors: Record<GraphNode['kind'], number> = {
+  concept: 0xf2b84b,
+  module: 0x7dd3fc,
+  publication: 0x5eead4,
+  theorist: 0xf87171,
 };
 
 function nodePosition(index: number, total: number) {
@@ -50,9 +50,10 @@ function createLabel(text: string) {
   return sprite;
 }
 
-export function TheoryGraph({ pages, activeId, onSelect }: TheoryGraphProps) {
+export function TheoryGraph({ nodes, edges, activeId, onSelect }: TheoryGraphProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const onSelectRef = useRef(onSelect);
+  const [selectedNodeId, setSelectedNodeId] = useState(activeId);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -88,15 +89,15 @@ export function TheoryGraph({ pages, activeId, onSelect }: TheoryGraphProps) {
     const disposableGeometries: THREE.BufferGeometry[] = [];
     const disposableTextures: THREE.Texture[] = [];
 
-    pages.forEach((page, index) => {
-      const position = nodePosition(index, pages.length);
-      positions.set(page.id, position);
+    nodes.forEach((entry, index) => {
+      const position = nodePosition(index, nodes.length);
+      positions.set(entry.id, position);
 
-      const geometry = new THREE.SphereGeometry(page.id === activeId ? 0.18 : 0.13, 24, 16);
+      const geometry = new THREE.SphereGeometry(entry.id === activeId ? 0.18 : 0.13, 24, 16);
       const material = new THREE.MeshStandardMaterial({
-        color: areaColors[page.area],
-        emissive: areaColors[page.area],
-        emissiveIntensity: page.id === activeId ? 0.42 : 0.16,
+        color: kindColors[entry.kind],
+        emissive: kindColors[entry.kind],
+        emissiveIntensity: entry.id === activeId ? 0.42 : 0.16,
         roughness: 0.48,
         metalness: 0.16,
       });
@@ -105,12 +106,12 @@ export function TheoryGraph({ pages, activeId, onSelect }: TheoryGraphProps) {
 
       const node = new THREE.Mesh(geometry, material);
       node.position.copy(position);
-      node.userData = { id: page.id };
+      node.userData = { id: entry.id, moduleId: entry.moduleId };
       group.add(node);
       nodeObjects.push(node);
 
-      const label = createLabel(page.title);
-      if (label && (page.id === activeId || index % 3 === 0)) {
+      const label = createLabel(entry.label);
+      if (label && (entry.id === activeId || entry.kind !== 'module')) {
         label.position.copy(position.clone().add(new THREE.Vector3(0, 0.42, 0)));
         group.add(label);
         if (label.material.map) disposableTextures.push(label.material.map);
@@ -138,11 +139,7 @@ export function TheoryGraph({ pages, activeId, onSelect }: TheoryGraphProps) {
       group.add(new THREE.Line(geometry, lineMaterial));
     };
 
-    pages.forEach((page, index) => {
-      const nextInGroup = pages.slice(index + 1).find((candidate) => candidate.group === page.group);
-      if (nextInGroup) addLine(page.id, nextInGroup.id);
-      page.relatedIds.forEach((relatedId) => addLine(page.id, relatedId));
-    });
+    edges.forEach((edge) => addLine(edge.from, edge.to));
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -162,7 +159,9 @@ export function TheoryGraph({ pages, activeId, onSelect }: TheoryGraphProps) {
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObjects(nodeObjects, false)[0];
       const id = hit?.object.userData.id as string | undefined;
-      if (id) onSelectRef.current(id);
+      const moduleId = hit?.object.userData.moduleId as string | undefined;
+      if (id) setSelectedNodeId(id);
+      if (moduleId) onSelectRef.current(moduleId);
     };
 
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
@@ -181,7 +180,11 @@ export function TheoryGraph({ pages, activeId, onSelect }: TheoryGraphProps) {
       renderer.render(scene, camera);
       animationId = window.requestAnimationFrame(animate);
     };
-    animate();
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      renderer.render(scene, camera);
+    } else {
+      animate();
+    }
 
     return () => {
       window.cancelAnimationFrame(animationId);
@@ -193,16 +196,17 @@ export function TheoryGraph({ pages, activeId, onSelect }: TheoryGraphProps) {
       disposableMaterials.forEach((material) => material.dispose());
       renderer.dispose();
     };
-  }, [activeId, pages]);
+  }, [activeId, edges, nodes]);
 
-  const activePage = pages.find((page) => page.id === activeId);
+  const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? nodes.find((node) => node.id === activeId);
 
   return (
     <div className="graph-wrap">
-      <div className="graph-canvas" ref={mountRef} aria-label="Interactive 3D theory graph" />
+      <div className="graph-canvas" ref={mountRef} aria-hidden="true" />
       <div className="graph-readout">
         <span>Selected node</span>
-        <strong>{activePage?.title ?? 'None'}</strong>
+        <strong>{selectedNode?.label ?? 'None'}</strong>
+        {selectedNode ? <a href={selectedNode.sourceUrl} target="_blank" rel="noreferrer">Source</a> : null}
       </div>
     </div>
   );

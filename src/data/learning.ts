@@ -207,19 +207,16 @@ export function buildAnnotationPrompts(page: SourcePage) {
 
   return [
     {
-      time: '00:12',
       label: 'Concept anchor',
       body: firstSentence(page.extract),
       tone: 'cyan',
     },
     {
-      time: '00:37',
       label: 'Visible evidence',
       body: `Name the frame, sound, edit, performance, or narrative detail that would support a ${page.title} reading.`,
       tone: 'amber',
     },
     {
-      time: '01:04',
       label: 'Counter-lens',
       body: related.length
         ? `Pressure-test the same scene against ${related.join(' and ')}.`
