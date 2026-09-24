@@ -15,4 +15,4 @@ Positioning sounds good. Proceed with "What Must Be Addressed": fix essay persis
 
 ## Handoff
 
-The dated acceptance record is `QA_MATRIX.md`. GitHub Pages publication and live verification remain release tasks until recorded there.
+The dated acceptance record is `QA_MATRIX.md`. GitHub Pages publication and live verification are recorded there for commit `844cbf7`.

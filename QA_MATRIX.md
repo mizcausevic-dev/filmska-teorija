@@ -11,7 +11,8 @@
 | Chromium responsive pass | Verified locally | Auteur route loaded at 1440x900, 820x1180, and 390x844; correct title/canonical, no page errors, no horizontal overflow. Screenshots in ignored `test-results/production-*.png`. |
 | `npm audit --audit-level=high` | Verified locally | Exit 0; reported zero vulnerabilities. |
 | `git diff --check` | Verified locally | Exit 0. |
-| GitHub Pages deployment | Pending | Verify workflow conclusion and live routes after push. |
+| GitHub Pages deployment | Verified live | Commit `844cbf7`: Pages run 36075034451 and CodeQL run 36075034445 both concluded success. |
+| Live HTTP and browser | Verified live | Root, Auteur, Apparatus, Film studies, sitemap, and privacy returned HTTP 200. Apparatus HTML includes its worked scene; Film studies is `noindex`. Chromium desktop/mobile opened Marxist directly, selected its lens, retained an essay draft after reload, and showed no page errors or horizontal overflow. |
 
 ## Browser Coverage
 
@@ -24,6 +25,7 @@ Playwright covers essay persistence and per-module isolation, selected lens, abb
 - The 3D graph is lazy-loaded and keyboard access is available through an HTML relationship list, but the on-demand Three.js chunk still triggers a Vite size warning.
 - Browser-local drafts can be removed by clearing site storage. There is no account sync, public community board, live AI partner, active GA4, or AdSense publisher integration.
 - The media clock test uses a synthetic browser media clock; it does not prove behavior of a third-party hosted video.
+- Search indexing and ad-network approval remain external decisions; these checks verify crawlable delivery and content boundaries, not ranking or acceptance.
 
 ## Historical Baseline
 
