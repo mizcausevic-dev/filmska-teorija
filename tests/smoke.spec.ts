@@ -37,6 +37,7 @@ test('renders the source-backed workbench and supports the core desktop flow', a
   await page.goto('/');
   await expect(page.locator('h1')).toHaveText('Film theory');
   await expect(page.getByText('24/24 modules loaded')).toBeVisible();
+  await expect(page.locator('.app-footer a')).toHaveText(['Privacy', 'Terms', 'llm.txt']);
   await expect(page.locator('.module-list').getByRole('link', { name: /Feminist film theory/ })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await page.getByRole('button', { name: 'Load 3D view' }).click();

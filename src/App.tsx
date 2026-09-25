@@ -1215,12 +1215,6 @@ function App() {
         </div>
         <footer className="app-footer">
           <span>Filmska Teorija is a local-first film theory workbench.</span>
-          <a href="https://kineticgain.com/" target="_blank" rel="noreferrer">
-            Kinetic Gain
-          </a>
-          <a href="https://www.linkedin.com/company/kinetic-gain/" target="_blank" rel="noreferrer">
-            LinkedIn
-          </a>
           <a href={`${import.meta.env.BASE_URL}privacy.html`}>Privacy</a>
           <a href={`${import.meta.env.BASE_URL}terms.html`}>Terms</a>
           <a href={`${import.meta.env.BASE_URL}llm.txt`}>llm.txt</a>
